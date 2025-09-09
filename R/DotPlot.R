@@ -255,11 +255,11 @@ DotPlot2 <- function(
   }
 
   if (flip) {
-    ToPlot$group <- factor(ToPlot$group, levels = rev(unique(ToPlot$group)))
-    ToPlot$Var1 <- factor(ToPlot$Var1, levels = unique(ToPlot$Var1))
+    ToPlot$group <- factor(ToPlot$group, levels = rev(levels(ToPlot$group)))
+    ToPlot$Var1 <- factor(ToPlot$Var1, levels = levels(ToPlot$Var1))
   } else {
-    ToPlot$group <- factor(ToPlot$group, levels = unique(ToPlot$group))
-    ToPlot$Var1 <- factor(ToPlot$Var1, levels = rev(unique(ToPlot$Var1)))
+    ToPlot$group <- factor(ToPlot$group, levels = levels(ToPlot$group))
+    ToPlot$Var1 <- factor(ToPlot$Var1, levels = rev(levels(ToPlot$Var1)))
   }
 
   value_range <- range(ToPlot$zscore)
@@ -424,7 +424,7 @@ DotPlot2 <- function(
   if (!is.null(split.by) && split.by.method == "annotation") {
     library(cowplot)
 
-    # Create annotation bar data 
+    # Create annotation bar data
     annotation_data <- ToPlot %>%
       dplyr::select(group, split, nudge) %>%
       dplyr::distinct() %>%
