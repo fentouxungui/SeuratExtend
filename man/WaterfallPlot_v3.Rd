@@ -33,7 +33,9 @@ WaterfallPlot_v3(
   style = c("bar", "segment"),
   border = NA,
   log.base = "e",
-  pseudocount = NULL
+  pseudocount = NULL,
+  max.cells.per.ident = Inf,
+  random.seed = 1
 )
 }
 \description{

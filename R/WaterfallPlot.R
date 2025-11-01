@@ -10,6 +10,8 @@ NULL
 #' @param slot Slot from which to retrieve feature data. Only applicable for the Seurat method.
 #' @param assay Name of the assay to use. If not specified, the active assay will be used. Only applicable for the Seurat method.
 #' @param priority If set to "expr", the function will fetch data from the expression matrix rather than `meta.data`. Only applicable for the Seurat method.
+#' @param max.cells.per.ident Down sample each identity class to a max number of cells. Default is Inf (no downsampling). When set to a finite value, cells from each group (ident.1 and ident.2) will be randomly downsampled to this number if they exceed it, ensuring more balanced comparisons between groups of different sizes.
+#' @param random.seed Random seed for reproducible downsampling when max.cells.per.ident is used. Default: 1.
 #' @rdname WaterfallPlot
 #' @export
 
@@ -42,7 +44,9 @@ WaterfallPlot.Seurat <- function(
     style = c("bar", "segment"),
     border = NA,
     log.base = "e",
-    pseudocount = NULL
+    pseudocount = NULL,
+    max.cells.per.ident = Inf,
+    random.seed = 1
 ) {
   style <- match.arg(style)
 
@@ -82,7 +86,9 @@ WaterfallPlot.Seurat <- function(
     style = style,
     border = border,
     log.base = log.base,
-    pseudocount = pseudocount
+    pseudocount = pseudocount,
+    max.cells.per.ident = max.cells.per.ident,
+    random.seed = random.seed
   )
 
   return(p)
@@ -135,6 +141,7 @@ WaterfallPlot.Seurat <- function(
 #'   "segment" for thin segments with end points.
 #' @param border Color for the border of bars when style="bar". Use NA for no border (default), or specify a color (e.g., "black").
 #' @param log.base The base for logarithmic calculations when using logFC. Can be "e" (natural logarithm, default), "2" (log2), or "10" (log10).
+#' @param pseudocount Pseudocount to add before calculating log fold change to avoid division by zero. If NULL (default), automatically determined based on data range: 0.01 for data in 0-1 range, 1 for other data types.
 #' @rdname WaterfallPlot
 #' @export
 
@@ -161,7 +168,9 @@ WaterfallPlot.default <- function(
     style = c("bar", "segment"),
     border = NA,
     log.base = "e",
-    pseudocount = NULL
+    pseudocount = NULL,
+    max.cells.per.ident = Inf,
+    random.seed = 1
 ) {
   style <- match.arg(style)
 
@@ -178,7 +187,9 @@ WaterfallPlot.default <- function(
     col.threshold = col.threshold,
     top.n = top.n,
     log.base = log.base,
-    pseudocount = pseudocount
+    pseudocount = pseudocount,
+    max.cells.per.ident = max.cells.per.ident,
+    random.seed = random.seed
   )
 
   titles <- WaterfallPlot_Title(
@@ -232,7 +243,9 @@ WaterfallPlot_Calc <- function(
     col.threshold,
     top.n,
     log.base = "e",
-    pseudocount = NULL
+    pseudocount = NULL,
+    max.cells.per.ident = Inf,
+    random.seed = 1
 ) {
   library(dplyr)
   library(rlist)
@@ -262,6 +275,40 @@ WaterfallPlot_Calc <- function(
 
   f <- factor(f)
   ident.1 <- ident.1 %||% levels(f)[1]
+
+  # Downsample cells if max.cells.per.ident is set
+  if (max.cells.per.ident < Inf) {
+    set.seed(seed = random.seed)
+
+    # Get indices of cells for each identity
+    idx.1 <- which(f == ident.1)
+    idx.2 <- if(is.null(ident.2)) which(f != ident.1) else which(f == ident.2)
+
+    # Determine ident.2 name for logging
+    ident.2.name <- if(is.null(ident.2)) paste0("non-", ident.1) else ident.2
+
+    # Track original sizes
+    n1_original <- length(idx.1)
+    n2_original <- length(idx.2)
+
+    # Downsample each group if needed
+    if (length(idx.1) > max.cells.per.ident) {
+      idx.1 <- sample(x = idx.1, size = max.cells.per.ident)
+      message("Downsampling ", ident.1, ": ", n1_original, " -> ", max.cells.per.ident, " cells")
+    }
+    if (length(idx.2) > max.cells.per.ident) {
+      idx.2 <- sample(x = idx.2, size = max.cells.per.ident)
+      message("Downsampling ", ident.2.name, ": ", n2_original, " -> ", max.cells.per.ident, " cells")
+    }
+
+    # Subset matrix and factor to selected cells only
+    idx.use <- c(idx.1, idx.2)
+    matr <- matr[, idx.use, drop = FALSE]
+    f <- f[idx.use]
+  }
+
+  # Create logical vectors for statistical calculations
+  # These are created AFTER potential downsampling, so they always match the current matr
   cell.1 <- (f == ident.1)
   cell.2 <- if(is.null(ident.2)) f != ident.1 else f == ident.2
 

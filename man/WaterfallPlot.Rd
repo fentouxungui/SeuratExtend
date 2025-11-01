@@ -37,7 +37,9 @@ WaterfallPlot(object, ...)
   style = c("bar", "segment"),
   border = NA,
   log.base = "e",
-  pseudocount = NULL
+  pseudocount = NULL,
+  max.cells.per.ident = Inf,
+  random.seed = 1
 )
 
 \method{WaterfallPlot}{default}(
@@ -63,7 +65,9 @@ WaterfallPlot(object, ...)
   style = c("bar", "segment"),
   border = NA,
   log.base = "e",
-  pseudocount = NULL
+  pseudocount = NULL,
+  max.cells.per.ident = Inf,
+  random.seed = 1
 )
 }
 \arguments{
@@ -131,6 +135,12 @@ such as z-scores or log fold changes.}
 \item{border}{Color for the border of bars when style="bar". Use NA for no border (default), or specify a color (e.g., "black").}
 
 \item{log.base}{The base for logarithmic calculations when using logFC. Can be "e" (natural logarithm, default), "2" (log2), or "10" (log10).}
+
+\item{pseudocount}{Pseudocount to add before calculating log fold change to avoid division by zero. If NULL (default), automatically determined based on data range: 0.01 for data in 0-1 range, 1 for other data types.}
+
+\item{max.cells.per.ident}{Down sample each identity class to a max number of cells. Default is Inf (no downsampling). When set to a finite value, cells from each group (ident.1 and ident.2) will be randomly downsampled to this number if they exceed it, ensuring more balanced comparisons between groups of different sizes.}
+
+\item{random.seed}{Random seed for reproducible downsampling when max.cells.per.ident is used. Default: 1.}
 
 \item{matr}{A matrix or data frame where rows represent features and columns represent cells.}
 

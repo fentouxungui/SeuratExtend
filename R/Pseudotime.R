@@ -560,3 +560,243 @@ compute_gradient <- function(row, n=10) {
 
   return(gradient_score)
 }
+
+#' @title Visualize Slingshot Trajectories on Dimensional Reduction Plot
+#' @description Creates a dimensional reduction plot with Slingshot trajectory curves overlaid. This function combines the visualization capabilities of DimPlot2 with Slingshot pseudotime trajectories, allowing users to visualize cell differentiation paths directly on UMAP, PCA, or other dimensionality reductions.
+#' @param seu A Seurat object that has undergone Slingshot trajectory analysis using RunSlingshot().
+#' @param features Variables to be visualized in the plot, accepting both discrete and continuous variables. Can visualize clusters, gene expression, or metadata. Default: NULL (uses default identity).
+#' @param group.by Alias for `features`. Default: NULL.
+#' @param reduction Which dimensionality reduction to use. If not specified, will automatically search for available Slingshot results in order of preference: 'umap', 'tsne', 'pca'. The reduction must match one used in RunSlingshot(). Default: NULL.
+#' @param curve.color Color(s) for the trajectory curves. Can be a single color or a vector of colors (one per lineage). Default: "black".
+#' @param curve.size Line width for the trajectory curves. Default: 1.
+#' @param curve.alpha Transparency of the trajectory curves. Default: 1.
+#' @param dims A two-length numeric vector specifying which dimensions to use for the x and y axes. Default: c(1, 2).
+#' @param cells A vector specifying a subset of cells to include in the plot. Default: all cells.
+#' @param slot Which data slot to use for pulling expression data. Default: 'data'.
+#' @param assay Specify the assay from which to retrieve data. Default: NULL (uses default assay).
+#' @param split.by A metadata column name by which to split the plot. Default: NULL.
+#' @param ncol Number of columns when combining multiple plots. Default: NULL.
+#' @param nrow Number of rows when combining multiple plots. Default: NULL.
+#' @param cols Color settings for cells. Can be a vector or list specifying colors for discrete/continuous variables. See DimPlot2 documentation for details. Default: list().
+#' @param load.cols Whether to load pre-stored color information from `seu@misc[["var_colors"]]`. Default: TRUE.
+#' @param pt.size Point size for cells. Default: NULL (auto-determined).
+#' @param label Whether to label clusters. Default: FALSE.
+#' @param label.color Color of cluster labels. Default: NULL (uses cluster colors).
+#' @param box Whether to draw a box around labels. Default: FALSE.
+#' @param repel Whether to use repelling algorithm for labels. Default: FALSE.
+#' @param label.size Size of text labels. Default: 4.
+#' @param theme Customizes ggplot themes. Can be a single theme element or a list of theme elements. Default: NULL.
+#' @param na.value Color for NA points. Default: 'grey80'.
+#' @param raster Whether to rasterize points. Default: NULL (auto-determined based on cell number).
+#' @param combine Whether to combine multiple plots into one. Default: TRUE.
+#' @return A ggplot object (if combine = TRUE) or list of ggplot objects showing cells colored by specified features with Slingshot trajectory curves overlaid.
+#' @details This function leverages DimPlot2's infrastructure to create dimensional reduction plots and overlays Slingshot trajectory curves on top. The function automatically detects which reduction was used for Slingshot analysis by checking `seu@misc$slingshot`. If the specified or auto-detected reduction doesn't have Slingshot results, the function will prompt the user to run RunSlingshot() first.
+#'
+#' The trajectory curves are extracted from the SlingshotDataSet stored in `seu@misc$slingshot[[reduction]]$SlingshotDataSet` and plotted as smooth curves connecting cells along their differentiation paths.
+#'
+#' Multiple lineages are supported, with each lineage drawn as a separate curve. Colors can be customized for each lineage by providing a vector of colors.
+#' @examples
+#' library(Seurat)
+#' library(SeuratExtend)
+#'
+#' # Load an example Seurat Object
+#' mye_small <- readRDS(url("https://zenodo.org/records/10944066/files/pbmc10k_mye_small_velocyto.rds", "rb"))
+#'
+#' # Run Slingshot on PCA
+#' mye_small <- RunSlingshot(mye_small, group.by = "cluster", start.clus = "Mono CD14", reducedDim = "PCA")
+#'
+#' # Basic trajectory plot with default settings
+#' DimPlot.Slingshot(mye_small)
+#'
+#' # Visualize with cluster labels
+#' DimPlot.Slingshot(mye_small, label = TRUE, repel = TRUE)
+#'
+#' # Color by gene expression with trajectory overlay
+#' DimPlot.Slingshot(mye_small, features = "CD14")
+#'
+#' # Customize trajectory appearance
+#' DimPlot.Slingshot(mye_small, curve.color = "red", curve.size = 2, curve.alpha = 0.6)
+#'
+#' # Multiple lineages with different colors
+#' DimPlot.Slingshot(mye_small, curve.color = c("blue", "red"))
+#'
+#' # Run Slingshot on UMAP and visualize
+#' mye_small <- RunSlingshot(mye_small, group.by = "cluster", start.clus = "Mono CD14", reducedDim = "umap")
+#' DimPlot.Slingshot(mye_small, reduction = "umap", theme = NoAxes())
+#'
+#' @rdname DimPlot.Slingshot
+#' @export
+
+DimPlot.Slingshot <- function(
+    seu,
+    features = NULL,
+    group.by = NULL,
+    reduction = NULL,
+    curve.color = "black",
+    curve.size = 1,
+    curve.alpha = 1,
+    dims = c(1, 2),
+    cells = NULL,
+    slot = "data",
+    assay = NULL,
+    split.by = NULL,
+    ncol = NULL,
+    nrow = NULL,
+    cols = list(),
+    load.cols = TRUE,
+    pt.size = NULL,
+    label = FALSE,
+    label.color = NULL,
+    box = FALSE,
+    repel = FALSE,
+    label.size = 4,
+    theme = NULL,
+    na.value = "grey80",
+    raster = NULL,
+    combine = TRUE
+) {
+
+  library(Seurat)
+  library(ggplot2)
+  import("slingshot")
+
+  # Helper function to find matching reduction (case-insensitive)
+  find_matching_reduction <- function(query, available) {
+    # Try exact match first
+    if (query %in% available) return(query)
+
+    # Try case-insensitive match
+    idx <- which(toupper(available) == toupper(query))
+    if (length(idx) > 0) return(available[idx[1]])
+
+    return(NULL)
+  }
+
+  # Get available Slingshot reductions
+  slingshot_reductions <- names(seu@misc$slingshot)
+
+  if (is.null(slingshot_reductions) || length(slingshot_reductions) == 0) {
+    stop("No Slingshot results found in seu@misc$slingshot. Please run RunSlingshot() first.")
+  }
+
+  # Determine which reduction to use for Slingshot data
+  slingshot_reduction <- NULL
+
+  if (is.null(reduction)) {
+    # Auto-detect reduction based on Slingshot results
+    # Try to find in order of preference: umap, tsne, pca
+    available_reductions <- c("umap", "tsne", "pca")
+
+    for (red in available_reductions) {
+      match <- find_matching_reduction(red, slingshot_reductions)
+      if (!is.null(match)) {
+        slingshot_reduction <- match
+        break
+      }
+    }
+
+    # If no common reduction found, use the first available
+    if (is.null(slingshot_reduction)) {
+      slingshot_reduction <- slingshot_reductions[1]
+      message("Using Slingshot reduction: ", slingshot_reduction)
+    }
+  } else {
+    # User specified a reduction, try to find matching Slingshot result (case-insensitive)
+    slingshot_reduction <- find_matching_reduction(reduction, slingshot_reductions)
+
+    if (is.null(slingshot_reduction)) {
+      stop(paste0(
+        "No Slingshot results found for reduction '", reduction, "'.\n",
+        "Available Slingshot reductions: ", paste(slingshot_reductions, collapse = ", "), "\n",
+        "Please run RunSlingshot() with a matching reducedDim first."
+      ))
+    }
+  }
+
+  # Extract Slingshot data
+  sds <- seu@misc$slingshot[[slingshot_reduction]]$SlingshotDataSet
+  if (is.null(sds)) {
+    stop(paste0("SlingshotDataSet not found for reduction '", slingshot_reduction, "'. Please run RunSlingshot() first."))
+  }
+
+  # Find the corresponding Seurat reduction (case-insensitive)
+  seurat_reductions <- names(seu@reductions)
+  seurat_reduction <- find_matching_reduction(slingshot_reduction, seurat_reductions)
+
+  if (is.null(seurat_reduction)) {
+    stop(paste0(
+      "Cannot find matching Seurat reduction for Slingshot reduction '", slingshot_reduction, "'.\n",
+      "Available Seurat reductions: ", paste(seurat_reductions, collapse = ", "), "\n",
+      "Please ensure the reduction exists in the Seurat object."
+    ))
+  }
+
+  # Create base DimPlot2 using the Seurat reduction name
+  p_base <- DimPlot2(
+    seu = seu,
+    features = features,
+    group.by = group.by,
+    dims = dims,
+    reduction = seurat_reduction,
+    cells = cells,
+    slot = slot,
+    assay = assay,
+    split.by = split.by,
+    ncol = ncol,
+    nrow = nrow,
+    cols = cols,
+    load.cols = load.cols,
+    pt.size = pt.size,
+    label = label,
+    label.color = label.color,
+    box = box,
+    repel = repel,
+    label.size = label.size,
+    theme = theme,
+    na.value = na.value,
+    raster = raster,
+    combine = FALSE
+  )
+
+  # Extract curve data from Slingshot
+  curves <- slingshot::slingCurves(sds)
+  n_lineages <- length(curves)
+
+  # Prepare curve colors
+  if (length(curve.color) == 1) {
+    curve.color <- rep(curve.color, n_lineages)
+  } else if (length(curve.color) < n_lineages) {
+    warning("Number of colors provided is less than number of lineages. Recycling colors.")
+    curve.color <- rep(curve.color, length.out = n_lineages)
+  }
+
+  # Get dimension names from the reduction
+  dim_names <- colnames(Embeddings(seu[[seurat_reduction]]))[dims]
+
+  # Add curves to each plot
+  p_with_curves <- lapply(p_base, function(p) {
+    for (i in seq_along(curves)) {
+      curve_data <- as.data.frame(curves[[i]]$s[curves[[i]]$ord, dims])
+      colnames(curve_data) <- c("x", "y")
+
+      p <- p + geom_path(
+        data = curve_data,
+        aes(x = x, y = y),
+        color = curve.color[i],
+        size = curve.size,
+        alpha = curve.alpha,
+        inherit.aes = FALSE
+      )
+    }
+    return(p)
+  })
+
+  # Combine plots if requested
+  if (combine) {
+    import("cowplot")
+    p_final <- plot_grid(plotlist = p_with_curves, ncol = ncol, nrow = nrow, align = "hv")
+    return(p_final)
+  } else {
+    return(p_with_curves)
+  }
+}

@@ -50,3 +50,7 @@ vignettes/single-cell-course
 # Temporary folder
 tmp/
 data-raw/2024-4-5 color pro from i want hue
+
+# Claude Code files
+.claude/
+CLAUDE.md
