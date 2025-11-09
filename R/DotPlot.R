@@ -56,6 +56,8 @@
 #' @param free_space Whether to allow free space in facets. Default: TRUE.
 #' @param show_grid Whether to show grid lines. Default: TRUE.
 #' @param scale_percent Whether to scale the percentage values to 0-100 range (TRUE) or keep them in 0-1 range (FALSE). Default: TRUE.
+#' @param col.min Minimum cutoff value for z-score color scale. Values below this threshold will be set to col.min. Default: NULL (no lower limit).
+#' @param col.max Maximum cutoff value for z-score color scale. Values above this threshold will be set to col.max. Default: NULL (no upper limit).
 #' @param legend_order Order of legends in the plot. Default: NULL (uses ggplot2 default order). When specified, must exactly match the available legend types for the current plot configuration. Use get_available_legends() helper function to see available options.
 #' @param ... Additional arguments passed to theme().
 #' @return A ggplot object representing the dot plot.
@@ -105,6 +107,9 @@
 #' # Control legend order
 #' DotPlot2(pbmc, features = genes, legend_order = c("fill", "size"))
 #'
+#' # Limit color scale range to avoid extreme values
+#' DotPlot2(pbmc, features = genes, col.min = -1, col.max = 1)
+#'
 #' @rdname DotPlot2
 #' @export
 
@@ -132,6 +137,8 @@ DotPlot2 <- function(
     free_space = TRUE,
     show_grid = TRUE,
     scale_percent = TRUE,
+    col.min = NULL,
+    col.max = NULL,
     legend_order = NULL,
     ...
 ) {
@@ -231,6 +238,11 @@ DotPlot2 <- function(
   }
 
   ToPlot <- inner_join(pct.m, z, by = c("Var1","Var2"))
+
+  # Apply col.min and col.max to zscore values
+  if (!is.null(col.min) || !is.null(col.max)) {
+    ToPlot$zscore <- MinMax_internal(ToPlot$zscore, min = col.min, max = col.max)
+  }
 
   # Split combined group back into original groups
   if (!is.null(split.by)) {
@@ -548,6 +560,22 @@ validate_features <- function(features, seu) {
 
     return(existing)
   }
+}
+
+# Internal function to limit values to a specified range
+# Similar to Seurat's MinMax function
+# @param data Numeric vector or matrix to be clipped
+# @param min Minimum cutoff value. Values below this will be set to min. Default: NULL (no lower limit)
+# @param max Maximum cutoff value. Values above this will be set to max. Default: NULL (no upper limit)
+# @return Data with values clipped to the specified range
+MinMax_internal <- function(data, min = NULL, max = NULL) {
+  if (!is.null(min)) {
+    data[data < min] <- min
+  }
+  if (!is.null(max)) {
+    data[data > max] <- max
+  }
+  return(data)
 }
 
 #' @title Get Available Legend Types for DotPlot2

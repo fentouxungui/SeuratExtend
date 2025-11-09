@@ -28,6 +28,8 @@ DotPlot2(
   free_space = TRUE,
   show_grid = TRUE,
   scale_percent = TRUE,
+  col.min = NULL,
+  col.max = NULL,
   legend_order = NULL,
   ...
 )
@@ -110,6 +112,10 @@ Flexible color settings for the plot, accepting a variety of inputs:
 
 \item{scale_percent}{Whether to scale the percentage values to 0-100 range (TRUE) or keep them in 0-1 range (FALSE). Default: TRUE.}
 
+\item{col.min}{Minimum cutoff value for z-score color scale. Values below this threshold will be set to col.min. Default: NULL (no lower limit).}
+
+\item{col.max}{Maximum cutoff value for z-score color scale. Values above this threshold will be set to col.max. Default: NULL (no upper limit).}
+
 \item{legend_order}{Order of legends in the plot. Default: NULL (uses ggplot2 default order). When specified, must exactly match the available legend types for the current plot configuration. Use get_available_legends() helper function to see available options.}
 
 \item{...}{Additional arguments passed to theme().}
@@ -166,5 +172,8 @@ DotPlot2(pbmc, features = genes, scale_percent = FALSE)
 
 # Control legend order
 DotPlot2(pbmc, features = genes, legend_order = c("fill", "size"))
+
+# Limit color scale range to avoid extreme values
+DotPlot2(pbmc, features = genes, col.min = -1, col.max = 1)
 
 }
