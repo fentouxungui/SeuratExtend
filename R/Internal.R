@@ -189,3 +189,20 @@ message_only_once <- function(title, message) {
     return(GetAssayData(object, slot = slot, assay = assay))
   }
 }
+
+# Internal function to limit values to a specified range
+# Similar to Seurat's MinMax function
+# Used by DotPlot2, Heatmap, and potentially other visualization functions
+# @param data Numeric vector or matrix to be clipped
+# @param min Minimum cutoff value. Values below this will be set to min. Default: NULL (no lower limit)
+# @param max Maximum cutoff value. Values above this will be set to max. Default: NULL (no upper limit)
+# @return Data with values clipped to the specified range
+MinMax_internal <- function(data, min = NULL, max = NULL) {
+  if (!is.null(min)) {
+    data[data < min] <- min
+  }
+  if (!is.null(max)) {
+    data[data > max] <- max
+  }
+  return(data)
+}

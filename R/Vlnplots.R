@@ -277,6 +277,15 @@ VlnPlot2_Calc <- function(
 ) {
   library(reshape2)
   if(!t) matr <- t(matr)
+
+  # Handle NULL rownames/colnames
+  if(is.null(rownames(matr))) {
+    rownames(matr) <- paste0("Cell_", 1:nrow(matr))
+  }
+  if(is.null(colnames(matr))) {
+    colnames(matr) <- paste0("Feature_", 1:ncol(matr))
+  }
+
   features <- features %||% colnames(matr)
   if(length(setdiff(features, colnames(matr))) > 0){
     message(paste0(setdiff(features, colnames(matr)), collapse = ", "), " not found")
@@ -410,7 +419,7 @@ VlnPlot2_Plot <- function(
   if(pt) {
     pt.style <- pt.style[1]
     if(!pt.style %in% c("quasirandom", "jitter")) stop('"pt.style" shoule be "quasirandom" or "jitter"')
-    if(pt.style == "jitter") p <- p + geom_jitter(width = width/2.2, size = pt.size, alpha= pt.alpha)
+    if(pt.style == "jitter") p <- p + geom_jitter(width = width/2.2, height = 0, size = pt.size, alpha= pt.alpha)
     if(pt.style == "quasirandom") {
       import("ggbeeswarm")
       p <- p + geom_quasirandom(size = pt.size, width = width/2, alpha= pt.alpha)

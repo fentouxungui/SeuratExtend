@@ -27,6 +27,8 @@
 #'   TRUE for diverging color palettes, FALSE for sequential palettes or custom color schemes.
 #'   This is particularly useful for visualizing data with both positive and negative values,
 #'   such as z-scores or log fold changes.
+#' @param col.min Minimum cutoff value for color scale. Values below this threshold will be set to col.min. Default: NULL (no lower limit).
+#' @param col.max Maximum cutoff value for color scale. Values above this threshold will be set to col.max. Default: NULL (no upper limit).
 #' @param border_color Color for the tile borders. Default: NULL.
 #' @param lab_fill Label for the color. Default: 'score'.
 #' @param angle Angle of x-axis labels. Default: NULL (auto-determined).
@@ -77,6 +79,9 @@
 #' # Adjust the left margin to ensure the x-axis labels fit within the plot boundaries
 #' Heatmap(toplot, lab_fill = "zscore", plot.margin = margin(l = 30))
 #'
+#' # Limit color scale range to avoid extreme values
+#' Heatmap(toplot, lab_fill = "zscore", col.min = -1, col.max = 1)
+#'
 #' # Construct a dense matrix with data for 500 genes.
 #' toplot2 <- CalcStats(pbmc, features = genes[1:500], method = "zscore", order = "p")
 #'
@@ -95,6 +100,8 @@ Heatmap <- function(
     score,
     color_scheme = "BuRd",
     center_color = NULL,
+    col.min = NULL,
+    col.max = NULL,
     border_color = NULL,
     lab_fill = "score",
     angle = NULL,
@@ -127,6 +134,12 @@ Heatmap <- function(
   ToPlot <-
     data.frame(score, id = factor(rownames(score), levels=unique(rev(rownames(score))))) %>%
     melt()
+
+  # Apply col.min and col.max to values
+  if (!is.null(col.min) || !is.null(col.max)) {
+    ToPlot$value <- MinMax_internal(ToPlot$value, min = col.min, max = col.max)
+  }
+
   value_range <- range(ToPlot$value)
   ToPlot$variable <- colnames(score)[ToPlot$variable] %>% factor(levels = unique(.))
 
