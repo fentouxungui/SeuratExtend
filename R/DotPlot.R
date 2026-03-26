@@ -5,12 +5,14 @@
 #' @param group.by Column name in seu@meta.data for grouping cells. Default: NULL (uses current Idents).
 #' @param cells Cell identifiers to be used. Defaults to all cells.
 #' @param split.by Column name in seu@meta.data for splitting the groups. Default: NULL.
-#' @param split.by.method Method for visualizing the split groups. Options are "border", "color", or "annotation". Default: "border".
+#' @param split.by.method Method for visualizing the split groups. Options are "border", "color", "annotation", or "facet". Default: "border".
 #'   - "border": Uses different border colors to represent different split groups, while the fill color represents the expression level.
 #'
 #'   - "color": Uses different dot colors to represent different split groups, while the transparency represents the expression level.
 #'
 #'   - "annotation": Creates a clean main plot with fill color representing expression level, and adds a separate annotation bar to show split groups. This method avoids visual interference between split group colors and expression level colors.
+#'
+#'   - "facet": Creates separate panels (facets) for each split group. When features is a named list, creates a 2D grid with feature groups on one axis and split groups on the other. This provides the clearest side-by-side comparison with identical color scales across panels.
 #' @param nudge_factor Factor to adjust the spacing between split groups. Default: 0.35.
 #' @param color_scheme Color scheme for the plot. When split.by is NULL, or when split.by is specified and split.by.method is "border", this color scheme is used to represent the relative expression level (zscore). Default: 'A'.
 #'    This parameter accepts multiple input formats to provide flexibility in defining color schemes:
@@ -93,6 +95,13 @@
 #'
 #' # Split visualization using annotation bar (cleanest visual separation)
 #' DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", split.by.method = "annotation")
+#'
+#' # Split visualization using faceting (separate panels for each split group)
+#' DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", split.by.method = "facet")
+#'
+#' # 2D faceting with grouped features (feature groups x split groups)
+#' DotPlot2(pbmc, features = list(group1 = genes[1:3], group2 = genes[4:6]),
+#'          group.by = "cluster", split.by = "orig.ident", split.by.method = "facet")
 #'
 #' # Use specific cells only
 #' b_cells <- colnames(pbmc)[pbmc$cluster == "B cell"]
@@ -251,10 +260,14 @@ DotPlot2 <- function(
     ToPlot$group <- factor(ToPlot$group, levels = group_levels)
     ToPlot$split <-  factor(ToPlot$split, levels = split_levels)
 
-    # Calculate nudge values
+    # Calculate nudge values (skip for facet method)
     n_splits <- length(split_levels)
-    nudge_values <- seq(-nudge_factor/2, nudge_factor/2, length.out = n_splits)
-    ToPlot$nudge <- nudge_values[ToPlot$split]
+    if (split.by.method == "facet") {
+      ToPlot$nudge <- 0
+    } else {
+      nudge_values <- seq(-nudge_factor/2, nudge_factor/2, length.out = n_splits)
+      ToPlot$nudge <- nudge_values[ToPlot$split]
+    }
   } else {
     ToPlot$group <- ToPlot$Var2
     ToPlot$split <- NA
@@ -333,6 +346,21 @@ DotPlot2 <- function(
       color_scale <- scale_color_disc_auto(split.by.colors, n_splits)
       alpha_scale <- scale_alpha(range = c(0.1, 1))
       color_lab <- split.by
+
+    } else if (split.by.method == "facet") {
+      # Facet method: separate panels for each split group
+      # No color needed for split - panels distinguish groups
+      # But still respect border parameter
+      if (border) {
+        p <- ggplot(ToPlot, aes(x = group, y = Var1, size = pct, fill = zscore)) +
+          geom_point(shape = 21, color = "black", stroke = border.width)
+        color_scale <- scale_fill_cont_auto(color_scheme, center_color = center_color, value_range = value_range)
+      } else {
+        p <- ggplot(ToPlot, aes(x = group, y = Var1, size = pct, color = zscore)) +
+          geom_point()
+        color_scale <- scale_color_cont_auto(color_scheme, center_color = center_color, value_range = value_range)
+      }
+      color_lab <- lab_value
     }
   } else {
     if (border) {
@@ -371,7 +399,24 @@ DotPlot2 <- function(
       guides(fill = guide_legend(override.aes = list(alpha = 1, color = NA, size = 4, shape = 22)))
   }
 
-  if (!is.null(feature_groups)) {
+  # Handle faceting: feature_groups and/or facet method
+  if (!is.null(split.by) && split.by.method == "facet") {
+    # Facet method: use split for faceting
+    if (!is.null(feature_groups)) {
+      # Both feature_groups and facet: 2D faceting
+      if (flip) {
+        p <- p + facet_grid(cols = vars(FeatureGroup), rows = vars(split),
+                            scales = "free", space = ifelse(free_space, "free", "fixed"))
+      } else {
+        p <- p + facet_grid(rows = vars(FeatureGroup), cols = vars(split),
+                            scales = "free", space = ifelse(free_space, "free", "fixed"))
+      }
+    } else {
+      # Only facet, no feature_groups
+      p <- p + facet_wrap(~split)
+    }
+  } else if (!is.null(feature_groups)) {
+    # Non-facet methods with feature_groups
     facet_scales <- ifelse(flip, "free_x", "free_y")
     facet_space <- ifelse(free_space, "free", "fixed")
 
@@ -463,8 +508,22 @@ DotPlot2 <- function(
           plot.margin = margin(0, 2, 0, 0)
         )
 
-      # Combine plots: annotation bar on left, main plot on right
-      combined_plot <- plot_grid(anno_plot, p, ncol = 2, rel_widths = c(0.03, 1), align = "h")
+      # Add dummy facet to match main plot structure when features are grouped
+      if (!is.null(feature_groups)) {
+        anno_plot <- anno_plot +
+          facet_grid(cols = vars(1), scales = "free_x", space = "free") +
+          theme(
+            strip.text = element_blank(),
+            strip.background = element_blank(),
+            panel.spacing = unit(0, "pt")
+          )
+      }
+
+      # Move legend to bottom for better layout with annotation bar on right
+      p <- p + theme(legend.position = "bottom")
+
+      # Combine plots: main plot on left, annotation bar on right
+      combined_plot <- plot_grid(p, anno_plot, ncol = 2, rel_widths = c(1, 0.03), align = "h")
 
     } else {
       # Annotation bar on top for normal plots
@@ -477,6 +536,17 @@ DotPlot2 <- function(
           legend.position = "none",
           plot.margin = margin(0, 0, 2, 0)
         )
+
+      # Add dummy facet to match main plot structure when features are grouped
+      if (!is.null(feature_groups)) {
+        anno_plot <- anno_plot +
+          facet_grid(rows = vars(1), scales = "free_y", space = "free") +
+          theme(
+            strip.text = element_blank(),
+            strip.background = element_blank(),
+            panel.spacing = unit(0, "pt")
+          )
+      }
 
       # Combine plots: annotation bar on top, main plot on bottom
       combined_plot <- plot_grid(anno_plot, p, nrow = 2, rel_heights = c(0.05, 1), align = "v")

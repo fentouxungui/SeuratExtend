@@ -45,12 +45,14 @@ DotPlot2(
 
 \item{split.by}{Column name in seu@meta.data for splitting the groups. Default: NULL.}
 
-\item{split.by.method}{Method for visualizing the split groups. Options are "border", "color", or "annotation". Default: "border".
+\item{split.by.method}{Method for visualizing the split groups. Options are "border", "color", "annotation", or "facet". Default: "border".
   - "border": Uses different border colors to represent different split groups, while the fill color represents the expression level.
 
   - "color": Uses different dot colors to represent different split groups, while the transparency represents the expression level.
 
-  - "annotation": Creates a clean main plot with fill color representing expression level, and adds a separate annotation bar to show split groups. This method avoids visual interference between split group colors and expression level colors.}
+  - "annotation": Creates a clean main plot with fill color representing expression level, and adds a separate annotation bar to show split groups. This method avoids visual interference between split group colors and expression level colors.
+
+  - "facet": Creates separate panels (facets) for each split group. When features is a named list, creates a 2D grid with feature groups on one axis and split groups on the other. This provides the clearest side-by-side comparison with identical color scales across panels.}
 
 \item{nudge_factor}{Factor to adjust the spacing between split groups. Default: 0.35.}
 
@@ -159,6 +161,13 @@ DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", 
 
 # Split visualization using annotation bar (cleanest visual separation)
 DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", split.by.method = "annotation")
+
+# Split visualization using faceting (separate panels for each split group)
+DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", split.by.method = "facet")
+
+# 2D faceting with grouped features (feature groups x split groups)
+DotPlot2(pbmc, features = list(group1 = genes[1:3], group2 = genes[4:6]),
+         group.by = "cluster", split.by = "orig.ident", split.by.method = "facet")
 
 # Use specific cells only
 b_cells <- colnames(pbmc)[pbmc$cluster == "B cell"]
