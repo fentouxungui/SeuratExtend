@@ -121,6 +121,8 @@
 #'   Default: TRUE.
 #' @param align Specifies how plots should be aligned if combined, accepting 'h' for horizontal, 'v' for vertical, or 'hv' for both.
 #'   Default: 'hv'.
+#' @param col.min Minimum cutoff value for color scale. Values below this threshold will be set to col.min. Default: NULL (no lower limit).
+#' @param col.max Maximum cutoff value for color scale. Values above this threshold will be set to col.max. Default: NULL (no upper limit).
 #' @return A ggplot object if `combine` is TRUE; otherwise, a list of ggplot objects, allowing for flexible plot arrangements or combined visualizations.
 #' @details `DimPlot2` extends the functionality of Seurat's visualization tools by combining the features of `DimPlot` and `FeaturePlot` into a single, more versatile function. It automatically recognizes whether the input features are discrete or continuous, adjusting the visualization accordingly. This makes `DimPlot2` ideal for exploring complex scRNA-seq data without the need to switch between different plotting functions based on variable types. The function also offers advanced customization options for colors, themes, and labeling, making it highly adaptable to various data visualization needs.
 #' @examples
@@ -172,6 +174,9 @@
 #'
 #' # Use indices instead of long cluster names to simplify labels in the plot
 #' DimPlot2(pbmc, index.title = "C", box = TRUE, label.color = "black")
+#'
+#' # Limit color scale range to avoid extreme values
+#' DimPlot2(pbmc, features = c("CD14", "CD3D"), col.min = 0, col.max = 3)
 #' @rdname DimPlot2
 #' @export
 
@@ -211,7 +216,9 @@ DimPlot2 <- function(
     raster = NULL,
     raster.dpi = NULL,
     combine = TRUE,
-    align = "hv"
+    align = "hv",
+    col.min = NULL,
+    col.max = NULL
 ) {
   plot_data <- DimPlot2_GetData(
     seu = seu,
@@ -266,6 +273,10 @@ DimPlot2 <- function(
     data.single <- data.dim
     data.single$var <- data.var[[i]]
     if(is_continuous(data.single$var)) {
+      # Apply col.min and col.max to clip extreme values
+      if (!is.null(col.min) || !is.null(col.max)) {
+        data.single$var <- MinMax_internal(data.single$var, min = col.min, max = col.max)
+      }
       scale_color <- DimPlot2_SelColCont(
         seu = seu,
         var = i,

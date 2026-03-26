@@ -40,7 +40,9 @@ DimPlot2(
   raster = NULL,
   raster.dpi = NULL,
   combine = TRUE,
-  align = "hv"
+  align = "hv",
+  col.min = NULL,
+  col.max = NULL
 )
 }
 \arguments{
@@ -199,6 +201,10 @@ Default: TRUE.}
 
 \item{align}{Specifies how plots should be aligned if combined, accepting 'h' for horizontal, 'v' for vertical, or 'hv' for both.
 Default: 'hv'.}
+
+\item{col.min}{Minimum cutoff value for color scale. Values below this threshold will be set to col.min. Default: NULL (no lower limit).}
+
+\item{col.max}{Maximum cutoff value for color scale. Values above this threshold will be set to col.max. Default: NULL (no upper limit).}
 }
 \value{
 A ggplot object if `combine` is TRUE; otherwise, a list of ggplot objects, allowing for flexible plot arrangements or combined visualizations.
@@ -258,4 +264,7 @@ DimPlot2(
 
 # Use indices instead of long cluster names to simplify labels in the plot
 DimPlot2(pbmc, index.title = "C", box = TRUE, label.color = "black")
+
+# Limit color scale range to avoid extreme values
+DimPlot2(pbmc, features = c("CD14", "CD3D"), col.min = 0, col.max = 3)
 }
