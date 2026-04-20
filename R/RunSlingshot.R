@@ -28,10 +28,15 @@
 
 
 RunSlingshot <- function(
-    Seu, group.by,
+    Seu, 
+    group.by,
     reducedDim = "PCA",
+    pca_features = NULL,
+    pca_scale = TRUE,
+    pca_ncomponents = 2,
     assay = NULL,
-    start.clus = NULL
+    start.clus = NULL,
+    end.clus = NULL
 ){
   import("slingshot")
   library(Seurat)
@@ -42,7 +47,13 @@ RunSlingshot <- function(
 
   sce <- as.SingleCellExperiment(Seu, assay = assay)
   Time1 <- Sys.time()
-  sce <- slingshot(sce, clusterLabels = group.by, reducedDim = reducedDim, start.clus = start.clus)
+  if (!is.null(pca_features)){
+      pca1 = prcomp(t(assays(sce)$logcounts[pca_features,]), scale=pca_scale)
+      reducedDims(sce) = SimpleList(PCA=pca1$x[, 1:pca_ncomponents])
+      sce <- slingshot(sce, clusterLabels = group.by, reducedDim = 'PCA', start.clus = start.clus, end.clus = end.clus)
+  }else{
+      sce <- slingshot(sce, clusterLabels = group.by, reducedDim = reducedDim, start.clus = start.clus, end.clus = end.clus)
+  }   
   Time2 <- Sys.time()
   message <- paste0("Time usage of slingshot: ", round(difftime(Time2, Time1, units='mins'), digits = 2), " mins")
   message(message)
