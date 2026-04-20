@@ -31,7 +31,7 @@ Install `SeuratExtend` directly from GitHub:
 if (!requireNamespace("remotes", quietly = TRUE)) {
     install.packages("remotes")
 }
-remotes::install_github("huayc09/SeuratExtend")
+remotes::install_github("fentouxungui/SeuratExtend")
 ```
 
 ## Vignettes and Tutorials
