@@ -53,3 +53,4 @@ Collate:
     'import.R'
     'runGSVA.R'
     'scVelo.R'
+    'Special.R'

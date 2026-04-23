@@ -1,5 +1,69 @@
 # SeuratExtend: An Enhanced Toolkit for scRNA-seq Analysis
 
+## **Updates**
+
+### Modified run Slingshot
+
+add new and parameters:
+
+``end.clus``: end clusters
+
+``pca_ncomponents``: default 2
+
+``pca_features``: features used for PCA
+
+``pca_scale``: whether to scale PCA
+
+```R
+cds <- RunSlingshot(cds, 
+                    pca_features = keep_markers,
+                    pca_ncomponents = 2,
+                    pca_scale = TRUE,
+                    group.by = "simple_celltype", 
+                    start.clus = "ISC/EB", 
+                    end.clus = c('EE','EC'))
+```
+
+### Enhanced GeneTrendHeatmap
+
+```R
+cds <- pseudotime_fake_order(seu = cds, 
+                             trajectoryPseudotimes = c('slingPseudotime_1', 'slingPseudotime_2'),
+                             celltype_column = 'simple_celltype', 
+                             trajectoryTo = c('EC', 'EE'), 
+                             trajectoryFrom = 'ISC/EB')
+
+
+df <- cds@misc$slingshot$PCA$SlingPseudotime
+df$celltype <- cds@meta.data$simple_celltype
+# ggplot(df, aes(x=slingPseudotime_fake)) + 
+#   geom_histogram() +
+#   facet_grid(celltype~ .)
+# ggplot(df, aes(x=slingPseudotime_fake_order)) + 
+#   geom_histogram() +
+#   facet_grid(celltype~ .)
+sling_id <- 'slingPseudotime_fake_order'
+sling_cells <- rownames(df)[!is.na(df[,sling_id])]
+# remove features with low expression
+features_sub <- features[apply(LayerData(cds, assay = 'RNA', layer = 'data')[features,sling_cells], 1, sum) > ncol(cds)/100]
+p <- GeneTrendHeatmap.Slingshot(
+  cds, 
+  features = features_sub, 
+  lineage = sling_id,
+)
+GeneTrendHeatmap_withCellGroup(p = p, 
+                               seu = cds,
+                               title = 'ISC/EB to EC and EE using fake psedutime value ranks',
+                               celltype_column = 'simple_celltype',
+                               siling_id = 'slingPseudotime_fake_order',
+                               celltype_levels = c('ISC/EB', 'EC', 'EE'),
+                               layout_heights = c(40, 1),
+                               feature_label_size = 8)
+```
+
+![](inst/extdata/demo.jpeg)<!-- -->
+
+
 ## Overview
 
 `SeuratExtend` is an R package designed to provide an improved and easy-to-use toolkit for scRNA-seq analysis and visualization, built upon the Seurat object. While `Seurat` is a widely-used tool in the R community that offers a foundational framework for scRNA-seq analysis, it has limitations when it comes to more advanced analysis and customized visualization. `SeuratExtend` expands upon `Seurat` by offering an array of enhanced visualization tools, an integrated functional and pathway analysis pipeline, seamless integration with popular Python tools, and a suite of utility functions for data manipulation and presentation. Designed to be user-friendly even for beginners, the package retains a level of professionalism that ensures rigorous analysis.
