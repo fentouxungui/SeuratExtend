@@ -48,7 +48,7 @@ RunSlingshot <- function(
   sce <- as.SingleCellExperiment(Seu, assay = assay)
   Time1 <- Sys.time()
   if (!is.null(pca_features)){
-      pca1 = prcomp(t(assays(sce)$logcounts[pca_features,]), scale=pca_scale)
+      pca1 = prcomp(t(as.matrix(assays(sce)$logcounts[pca_features,])), scale=pca_scale)
       reducedDims(sce) = SimpleList(PCA=pca1$x[, 1:pca_ncomponents])
       sce <- slingshot(sce, clusterLabels = group.by, reducedDim = 'PCA', start.clus = start.clus, end.clus = end.clus)
   }else{
